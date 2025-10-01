@@ -14,14 +14,18 @@
     canvas {
       display: block;
     }
-    #clock {
+    #dateTimeBar {
       position: absolute;
       top: 10%;
       left: 50%;
       transform: translateX(-50%);
-      font-size: calc(40vw / 10);
+      display: flex;
+      gap: 20px;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
       color: #ffffff;
-      text-shadow: 0 0 10px rgba(255,255,255,0.5);
+      text-shadow: 0 0 6px rgba(255,255,255,0.3);
       animation: float 6s ease-in-out infinite;
       z-index: 10;
     }
@@ -29,16 +33,6 @@
       0%   { transform: translate(-50%, 0); }
       50%  { transform: translate(-50%, -10px); }
       100% { transform: translate(-50%, 0); }
-    }
-    #clockLine {
-      position: absolute;
-      top: 10%;
-      left: 0;
-      width: 100%;
-      height: 2px;
-      background: #ffffff;
-      opacity: 0.2;
-      z-index: 9;
     }
     #controlPanel {
       position: absolute;
@@ -69,8 +63,11 @@
 </head>
 <body>
   <canvas id="game"></canvas>
-  <div id="clockLine"></div>
-  <div id="clock">--:--:--</div>
+  <div id="dateTimeBar">
+    <span id="dateDisplay">----/--/-- (---)</span>
+    <span id="separator">_____</span>
+    <span id="clock">--:--:--</span>
+  </div>
   <div id="controlPanel">
     <input id="wordInput" placeholder="言霊を打ち込んで Enter" />
     <label>色:</label>
@@ -100,6 +97,7 @@
     const canvas = document.getElementById("game");
     const ctx = canvas.getContext("2d");
     const clock = document.getElementById("clock");
+    const dateDisplay = document.getElementById("dateDisplay");
     const wordInput = document.getElementById("wordInput");
     const colorSelect = document.getElementById("colorSelect");
     const fontSizeSlider = document.getElementById("fontSizeSlider");
@@ -119,15 +117,21 @@
     window.addEventListener("resize", resizeCanvas);
     resizeCanvas();
 
-    function updateClock() {
+    function updateClockAndDate() {
       const now = new Date();
       const h = String(now.getHours()).padStart(2, '0');
       const m = String(now.getMinutes()).padStart(2, '0');
       const s = String(now.getSeconds()).padStart(2, '0');
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const weekdayNames = ["日", "月", "火", "水", "木", "金", "土"];
+      const weekday = weekdayNames[now.getDay()];
       clock.textContent = `${h}:${m}:${s}`;
+      dateDisplay.textContent = `${year}/${month}/${day} (${weekday})`;
     }
-    setInterval(updateClock, 1000);
-    updateClock();
+    setInterval(updateClockAndDate, 1000);
+    updateClockAndDate();
 
     wordInput.addEventListener("keydown", e => {
       if (e.key === "Enter" && wordInput.value.trim()) {
