@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>幻想水槽UI</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #000000;
+      font-family: sans-serif;
+    }
+    canvas {
+      display: block;
+    }
+    #clock {
+      position: absolute;
+      top: 10%;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: calc(40vw / 10);
+      color: #ffffff;
+      text-shadow: 0 0 10px rgba(255,255,255,0.5);
+      animation: float 6s ease-in-out infinite;
+      z-index: 10;
+    }
+    @keyframes float {
+      0%   { transform: translate(-50%, 0); }
+      50%  { transform: translate(-50%, -10px); }
+      100% { transform: translate(-50%, 0); }
+    }
+    #clockLine {
+      position: absolute;
+      top: 10%;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      background: #ffffff;
+      opacity: 0.2;
+      z-index: 9;
+    }
+    #controlPanel {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.6);
+      padding: 10px;
+      border-radius: 12px;
+      color: white;
+      font-size: 16px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      z-index: 20;
+    }
+    #controlPanel input,
+    #controlPanel select,
+    #controlPanel button {
+      font-size: 16px;
+      padding: 4px;
+      border-radius: 6px;
+      border: none;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+  <div id="clockLine"></div>
+  <div id="clock">--:--:--</div>
+  <div id="controlPanel">
+    <input id="wordInput" placeholder="言霊を打ち込んで Enter" />
+    <label>色:</label>
+    <select id="colorSelect">
+      <option value="#ff0000">赤</option>
+      <option value="#00ff00">緑</option>
+      <option value="#0000ff">青</option>
+      <option value="#ffff00">黄</option>
+      <option value="#ff00ff">紫</option>
+      <option value="#00ffff">水</option>
+      <option value="#ffffff">白</option>
+      <option value="#ff8800">橙</option>
+      <option value="#888888">灰</option>
+      <option value="#ff69b4">ピンク</option>
+    </select>
+    <label>フォントサイズ:</label>
+    <input type="range" id="fontSizeSlider" min="10" max="40" value="20" />
+    <label>落下スピード:</label>
+    <input type="range" id="speedSlider" min="0.5" max="5" step="0.1" value="1.5" />
+    <input type="file" id="importFile" accept=".txt" />
+    <button onclick="exportWords()">エクスポート</button>
+    <button onclick="startGame()">開始</button>
+    <button onclick="pauseGame()">中断</button>
+    <button onclick="stopGame()">停止</button>
+  </div>
+  <script>
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+    const clock = document.getElementById("clock");
+    const wordInput = document.getElementById("wordInput");
+    const colorSelect = document.getElementById("colorSelect");
+    const fontSizeSlider = document.getElementById("fontSizeSlider");
+    const speedSlider = document.getElementById("speedSlider");
+    const importFile = document.getElementById("importFile");
+
+    let customWords = [];
+    let fallingWords = [];
+    let animationId = null;
+    let gameRunning = false;
+    let gamePaused = false;
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener("resize", resizeCanvas);
+    resizeCanvas();
+
+    function updateClock() {
+      const now = new Date();
+      const h = String(now.getHours()).padStart(2, '0');
+      const m = String(now.getMinutes()).padStart(2, '0');
+      const s = String(now.getSeconds()).padStart(2, '0');
+      clock.textContent = `${h}:${m}:${s}`;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    wordInput.addEventListener("keydown", e => {
+      if (e.key === "Enter" && wordInput.value.trim()) {
+        customWords.push(wordInput.value.trim());
+        wordInput.value = "";
+      }
+    });
+
+    importFile.addEventListener("change", e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const lines = reader.result.split("\n").map(line => line.trim()).filter(Boolean);
+        customWords.push(...lines);
+      };
+      reader.readAsText(file, "UTF-8");
+    });
+
+    function exportWords() {
+      const blob = new Blob([customWords.join("\n")], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "kotodama.txt";
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function createFallingWord() {
+      if (!gameRunning || gamePaused) return;
+      const text = customWords.length > 0
+        ? customWords[Math.floor(Math.random() * customWords.length)]
+        : "幻想";
+      const x = Math.random() * canvas.width;
+      const color = colorSelect.value;
+      const fontSize = parseInt(fontSizeSlider.value);
+      fallingWords.push({ text, x, y: 0, color, fontSize });
+    }
+
+    function drawWord(word) {
+      ctx.fillStyle = word.color;
+      ctx.font = `bold ${word.fontSize}px sans-serif`;
+      ctx.fillText(word.text, word.x, word.y);
+    }
+
+    function gameLoop() {
+      if (!gameRunning || gamePaused) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const speed = parseFloat(speedSlider.value);
+      for (let word of fallingWords) {
+        word.y += speed;
+        drawWord(word);
+      }
+
+      fallingWords = fallingWords.filter(w => w.y < canvas.height);
+      animationId = requestAnimationFrame(gameLoop);
+    }
+
+    function startGame() {
+      if (!gameRunning) {
+        gameRunning = true;
+        gamePaused = false;
+        setInterval(createFallingWord, 2000);
+        gameLoop();
+      } else if (gamePaused) {
+        gamePaused = false;
+        gameLoop();
+      }
+    }
+
+    function pauseGame() {
+      gamePaused = true;
+      if (animationId) cancelAnimationFrame(animationId);
+    }
+
+    function stopGame() {
+      gameRunning = false;
+      gamePaused = false;
+      fallingWords = [];
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (animationId) cancelAnimationFrame(animationId);
+    }
+  </script>
+</body>
+</html>
